@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  MEMBER
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  VOID
+}
+
+enum PdfJobStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+}
+
+model Organization {
+  id            String       @id @default(cuid())
+  legalName     String
+  address       String?
+  taxId         String?
+  logoUrl       String?
+  invoicePrefix String       @default("INV")
+  invoiceSeq    Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  memberships   Membership[]
+  clients       Client[]
+  invoices      Invoice[]
+  pdfJobs       PdfJob[]
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole
+  createdAt      DateTime       @default(now())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model Client {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  email          String?
+  address        String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoices       Invoice[]
+
+  @@index([organizationId])
+}
+
+model Invoice {
+  id              String          @id @default(cuid())
+  organizationId  String
+  clientId        String
+  number          String
+  status          InvoiceStatus   @default(DRAFT)
+  currency        String          @default("USD")
+  issueDate       DateTime
+  dueDate         DateTime?
+  notes           String?
+  subtotalCents   Int
+  taxCents        Int             @default(0)
+  totalCents      Int
+  createdByUserId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client          Client          @relation(fields: [clientId], references: [id])
+  lineItems       InvoiceLineItem[]
+  pdfJobs         PdfJob[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+}
+
+model InvoiceLineItem {
+  id             String  @id @default(cuid())
+  invoiceId      String
+  description    String
+  quantity       Decimal @db.Decimal(12, 4)
+  unitPriceCents Int
+  sortOrder      Int     @default(0)
+  invoice        Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model PdfJob {
+  id             String       @id @default(cuid())
+  organizationId String
+  invoiceId      String
+  bullJobId      String?
+  status         PdfJobStatus @default(QUEUED)
+  storagePath    String?
+  errorMessage   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([invoiceId])
+}

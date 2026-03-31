@@ -1,0 +1,14 @@
+{
+  "name": "invoice-generator",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev -w api",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w api && npm run build -w web",
+    "docker:up": "docker compose up --build",
+    "prisma:generate": "npm run prisma:generate -w api"
+  }
+}
